@@ -7,11 +7,8 @@ class GameWindow(arcade.Window):
         super().__init__(width, height, title)
         self.key_mappings = key_mappings
         self.key_state = {key: None for key in self.key_mappings.keys()}
-        self.tank_list = None
-        self.wall_list = None
-        self.player_speed = None
         self.mouse_position = (0,0)
-        arcade.set_background_color(arcade.csscolor.CORNFLOWER_BLUE)
+        arcade.set_background_color(arcade.csscolor.BLACK)
 
     def setup(self):
         self.tank_list = arcade.SpriteList()
@@ -27,8 +24,36 @@ class GameWindow(arcade.Window):
         box_sprite.center_y = 200
         self.wall_list.append(box_sprite)
 
+        self.bullet_list = arcade.SpriteList()
+       
         self.physics_engines = []
         self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.wheel_sprite, self.wall_list))
+
+
+    def setup_level(self):
+        self.tank_list = arcade.SpriteList()
+        self.tank = Tank()
+        self.tank_list.append(self.tank.wheel_sprite)
+        self.tank_list.append(self.tank.body_sprite)
+        self.tank_list.append(self.tank.turret_sprite)
+        self.tank.set_position(100, 100)        
+
+        self.bullet_list = arcade.SpriteList()
+
+        map_name = "res/level.tmx"
+        my_map = arcade.tilemap.read_tmx(map_name)
+        self.wall_list = arcade.tilemap.process_layer(map_object=my_map,
+                                                      layer_name="boundary")
+        self.box_list = arcade.tilemap.process_layer(my_map,"box")
+        self.foreground_list =  arcade.tilemap.process_layer(my_map,"foreground")
+        self.background_list =  arcade.tilemap.process_layer(my_map,"background")
+        self.terrain_list =  arcade.tilemap.process_layer(my_map,"terrain")
+
+        if my_map.background_color:
+            arcade.set_background_color(my_map.background_color)
+        self.physics_engines = []
+        self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.wheel_sprite, self.wall_list))
+
 
     def on_key_press(self, key, modifiers):
         for key_k in self.key_state.keys():
@@ -39,6 +64,10 @@ class GameWindow(arcade.Window):
         for key_k in self.key_state.keys():
             if self.key_mappings[key_k] == key:
                 self.key_state[key_k] = False
+    
+    def on_mouse_press(self, x, y, button, modifiers):
+        bullet = self.tank.fire()
+        self.bullet_list.append(bullet)
 
     def movement(self):
         self.tank.change_position(0,0)
@@ -73,6 +102,13 @@ class GameWindow(arcade.Window):
     def on_update(self, delta_time):
         """ Movement and game logic """
         self.movement()
+        self.bullet_list.update()
+
+        for bullet in self.bullet_list:
+            hit_list = arcade.check_for_collision_with_list(bullet, self.wall_list)
+            if len(hit_list) > 0:
+                bullet.remove_from_sprite_lists()
+
         for engine in self.physics_engines:
             engine.update()
         self.tank.body_sprite.position = self.tank.wheel_sprite.position
@@ -81,7 +117,12 @@ class GameWindow(arcade.Window):
 
     def on_draw(self):
         arcade.start_render()
+        self.box_list.draw()
+        self.background_list.draw()
+        self.terrain_list.draw()
+        self.foreground_list.draw()
         self.wall_list.draw()
+        self.bullet_list.draw()
         self.tank_list.draw()
 
 
@@ -95,7 +136,7 @@ def main():
     }
 
     window = GameWindow(800, 600, "My Arcade game", key_mappings)
-    window.setup()
+    window.setup_level()
     arcade.run()
 
 

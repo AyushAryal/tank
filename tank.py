@@ -2,6 +2,7 @@ import arcade
 import math
 
 class Tank(object):
+    
     def __init__(self):
         self.texture_list = arcade.load_spritesheet("res/tank_spritesheet_v2.png", 120, 120, 3, 3)
         self.wheel_sprite = arcade.Sprite()
@@ -9,7 +10,7 @@ class Tank(object):
         self.wheel_sprite.set_texture(0)
         self.wheel_sprite.center_x = 0
         self.wheel_sprite.center_y = 0
-        self.wheel_sprite.set_hit_box([[-50, -50], [50, -50], [50, 50], [-50, 50]])
+        self.wheel_sprite.set_hit_box([[-50, -50], [50, -50], [50, 50], [-50, 50]]) # 120x120 px
         
         
         self.body_sprite = arcade.Sprite()
@@ -58,3 +59,22 @@ class Tank(object):
         self.rotation += radian
         self.wheel_sprite.radians = self.rotation - math.radians(90)
         self.body_sprite.radians = self.rotation - math.radians(90)
+
+    def fire(self):
+        x, y = self.body_sprite.position
+        x += 60 * math.cos(self.turret_sprite.radians + math.radians(90))
+        y += 60 * math.sin(self.turret_sprite.radians + math.radians(90))
+        position = (x,y)
+        bullet = Bullet(position, self.turret_sprite.radians + math.radians(90), speed = 10)
+        return bullet
+
+
+class Bullet(arcade.Sprite):
+    def __init__(self, position, rotation, speed, *args, **kwargs):
+        super().__init__("res/bullet.png", *args, **kwargs)        
+        self.damage = 10
+        self.position = position
+        self.radians = rotation
+        self.velocity = (speed * math.cos(rotation), speed * math.sin(rotation))
+        self.set_hit_box([(0,-6),(14, -6), (14, 6), (0,6)])
+
