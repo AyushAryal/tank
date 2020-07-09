@@ -1,53 +1,6 @@
 import arcade
 import math
-
-class Tank(object):
-    def __init__(self):
-        self.texture_list = arcade.load_spritesheet("res/tank_spritesheet_v1.png", 800, 800, 3, 3)
-        self.wheel_sprite = arcade.Sprite(scale = 0.15)
-        self.wheel_sprite.append_texture(self.texture_list[0])
-        self.wheel_sprite.set_texture(0)
-        self.wheel_sprite.center_x = 0
-        self.wheel_sprite.center_y = 0
-        
-        self.body_sprite = arcade.Sprite(scale = 0.15)
-        self.body_sprite.append_texture(self.texture_list[1])
-        self.body_sprite.set_texture(0)
-        self.body_sprite.center_x = 0
-        self.body_sprite.center_y = 0
-        
-        self.turret_sprite = arcade.Sprite(scale = 0.15)
-        self.turret_sprite.append_texture(self.texture_list[2])
-        self.turret_sprite.set_texture(0)
-        self.turret_sprite.center_x = 0
-        self.turret_sprite.center_y = 0
-
-        self.movement_speed = 5
-
-    def set_position(self, x, y):
-        self.wheel_sprite.center_x = x
-        self.wheel_sprite.center_y = y 
-
-        self.body_sprite.center_x = x
-        self.body_sprite.center_y = y 
-
-        self.turret_sprite.center_x = x
-        self.turret_sprite.center_y = y
-
-    def change_position(self, x, y):
-
-        if x is not None:
-            self.wheel_sprite.change_x = x        
-            self.body_sprite.change_x = x
-            self.turret_sprite.change_x = x
-
-        if y is not None:
-            self.wheel_sprite.change_y = y 
-            self.body_sprite.change_y = y 
-            self.turret_sprite.change_y = y
-
-    def rotate_turret(self, radian):
-            self.turret_sprite.radians = radian
+from tank import Tank
 
 class GameWindow(arcade.Window):
     def __init__(self, width, height, title, key_mappings):
@@ -68,12 +21,14 @@ class GameWindow(arcade.Window):
         self.tank_list.append(self.tank.turret_sprite)
         self.tank.set_position(100, 100)        
 
-        self.wall_list = arcade.SpriteList()
+        self.wall_list = arcade.SpriteList(use_spatial_hash=True)
+        box_sprite = arcade.Sprite("res/box.png")
+        box_sprite.center_x = 200
+        box_sprite.center_y = 200
+        self.wall_list.append(box_sprite)
 
         self.physics_engines = []
         self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.wheel_sprite, self.wall_list))
-        self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.body_sprite, self.wall_list))
-        self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.turret_sprite, self.wall_list))
 
     def on_key_press(self, key, modifiers):
         for key_k in self.key_state.keys():
@@ -87,14 +42,21 @@ class GameWindow(arcade.Window):
 
     def movement(self):
         self.tank.change_position(0,0)
-        if self.key_state["UP"] and not self.key_state["DOWN"]:
-            self.tank.change_position(None, self.tank.movement_speed)
-        elif self.key_state["DOWN"] and not self.key_state["UP"]:
-            self.tank.change_position(None, -self.tank.movement_speed)
+
         if self.key_state["LEFT"] and not self.key_state["RIGHT"]:
-            self.tank.change_position(-self.tank.movement_speed,None)
+            self.tank.rotate_body(self.tank.rotation_speed)
         elif self.key_state["RIGHT"] and not self.key_state["LEFT"]:
-            self.tank.change_position(self.tank.movement_speed,None)
+            self.tank.rotate_body(-self.tank.rotation_speed)
+        if self.key_state["UP"] and not self.key_state["DOWN"]:
+            r = self.tank.rotation
+            y = math.sin(r) * self.tank.movement_speed
+            x = math.cos(r) * self.tank.movement_speed
+            self.tank.change_position(x,y)
+        elif self.key_state["DOWN"] and not self.key_state["UP"]:
+            r = self.tank.rotation
+            y = -math.sin(r) * self.tank.movement_speed
+            x = -math.cos(r) * self.tank.movement_speed
+            self.tank.change_position(x,y)
 
     def rotate_turret(self):
         turret_x, turret_y = self.tank.turret_sprite.position
@@ -113,12 +75,14 @@ class GameWindow(arcade.Window):
         self.movement()
         for engine in self.physics_engines:
             engine.update()
+        self.tank.body_sprite.position = self.tank.wheel_sprite.position
+        self.tank.turret_sprite.position = self.tank.wheel_sprite.position
         self.rotate_turret()
 
     def on_draw(self):
         arcade.start_render()
+        self.wall_list.draw()
         self.tank_list.draw()
-        # Code to draw the screen goes here
 
 
 def main():
