@@ -29,6 +29,8 @@ class Tank(object):
         self.rotation_speed = math.radians(3)
         self.rotation = math.radians(90)
 
+        self.health = 100.0
+
     def set_position(self, x, y):
         self.wheel_sprite.center_x = x
         self.wheel_sprite.center_y = y 
@@ -51,8 +53,14 @@ class Tank(object):
             self.body_sprite.change_y = y 
             self.turret_sprite.change_y = y
 
-    def rotate_turret(self, radian):
-        self.turret_sprite.radians = radian
+    def rotate_turret(self, mouse_position, view_position):
+        turret_x, turret_y = self.turret_sprite.position
+        x, y = mouse_position
+        x += view_position[0]
+        y += view_position[1]
+        if (turret_y-y) != 0:
+            rad = math.atan2((turret_x-x), (y-turret_y))
+            self.turret_sprite.radians = rad
 
 
     def rotate_body(self, radian):
@@ -67,7 +75,23 @@ class Tank(object):
         position = (x,y)
         bullet = Bullet(position, self.turret_sprite.radians + math.radians(90), speed = 10)
         return bullet
-
+    
+    def movement(self, key_state):
+        self.change_position(0, 0)
+        if key_state["LEFT"] and not key_state["RIGHT"]:
+            self.rotate_body(self.rotation_speed)
+        elif key_state["RIGHT"] and not key_state["LEFT"]:
+            self.rotate_body(-self.rotation_speed)
+        if key_state["UP"] and not key_state["DOWN"]:
+            r = self.rotation
+            y = math.sin(r) * self.movement_speed
+            x = math.cos(r) * self.movement_speed
+            self.change_position(x, y)
+        elif key_state["DOWN"] and not key_state["UP"]:
+            r = self.rotation
+            y = -math.sin(r) * self.movement_speed
+            x = -math.cos(r) * self.movement_speed
+            self.change_position(x, y)
 
 class Bullet(arcade.Sprite):
     def __init__(self, position, rotation, speed, *args, **kwargs):

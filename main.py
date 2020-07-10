@@ -2,140 +2,174 @@ import arcade
 import math
 from tank import Tank
 
+
 class GameWindow(arcade.Window):
     def __init__(self, width, height, title, key_mappings):
         super().__init__(width, height, title)
+        self.window_size = (width, height)
         self.key_mappings = key_mappings
         self.key_state = {key: None for key in self.key_mappings.keys()}
-        self.mouse_position = (0,0)
-        arcade.set_background_color(arcade.csscolor.BLACK)
+        self.mouse_position = (0, 0)
+        self.view_left = 0
+        self.view_bottom = 0
 
-    def setup(self):
+    def setup_level(self, map_source="res/level.tmx"):
         self.tank_list = arcade.SpriteList()
         self.tank = Tank()
         self.tank_list.append(self.tank.wheel_sprite)
         self.tank_list.append(self.tank.body_sprite)
         self.tank_list.append(self.tank.turret_sprite)
-        self.tank.set_position(100, 100)        
-
-        self.wall_list = arcade.SpriteList(use_spatial_hash=True)
-        box_sprite = arcade.Sprite("res/box.png")
-        box_sprite.center_x = 200
-        box_sprite.center_y = 200
-        self.wall_list.append(box_sprite)
-
-        self.bullet_list = arcade.SpriteList()
-       
-        self.physics_engines = []
-        self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.wheel_sprite, self.wall_list))
-
-
-    def setup_level(self):
-        self.tank_list = arcade.SpriteList()
-        self.tank = Tank()
-        self.tank_list.append(self.tank.wheel_sprite)
-        self.tank_list.append(self.tank.body_sprite)
-        self.tank_list.append(self.tank.turret_sprite)
-        self.tank.set_position(100, 100)        
+        self.tank.set_position(100, 100)
 
         self.bullet_list = arcade.SpriteList()
 
-        map_name = "res/level.tmx"
-        my_map = arcade.tilemap.read_tmx(map_name)
-        self.wall_list = arcade.tilemap.process_layer(map_object=my_map,
-                                                      layer_name="boundary")
-        self.box_list = arcade.tilemap.process_layer(my_map,"box")
-        self.foreground_list =  arcade.tilemap.process_layer(my_map,"foreground")
-        self.background_list =  arcade.tilemap.process_layer(my_map,"background")
-        self.terrain_list =  arcade.tilemap.process_layer(my_map,"terrain")
+        my_map = arcade.tilemap.read_tmx(map_source)
+        self.layers = {key: None for key in (
+            "boundary", "background", "terrain", "box")}
 
         if my_map.background_color:
             arcade.set_background_color(my_map.background_color)
-        self.physics_engines = []
-        self.physics_engines.append(arcade.PhysicsEngineSimple(self.tank.wheel_sprite, self.wall_list))
 
+        for layer_name in self.layers.keys():
+            self.layers[layer_name] = arcade.tilemap.process_layer(map_object=my_map,
+                                                                   layer_name=layer_name)
+
+        def calculate_boundary(boundary_layer):
+            x_list = []
+            y_list = []
+            tile_width = boundary_layer[0].width // 2
+            tile_height = boundary_layer[0].height // 2
+            for boundary in boundary_layer:
+                x_list.append(boundary.center_x)
+                y_list.append(boundary.center_y)
+            return ((min(x_list)-tile_width, min(y_list)-tile_height), (max(x_list)+tile_width, max(y_list)+tile_height))
+
+        self.level_boundary = calculate_boundary(self.layers["boundary"])
+        print(self.level_boundary)
+
+        self.physics_engines = []
+        self.physics_engines.append(arcade.PhysicsEngineSimple(
+            self.tank.wheel_sprite, self.layers["boundary"]))
+        self.physics_engines.append(arcade.PhysicsEngineSimple(
+            self.tank.wheel_sprite, self.layers["box"]))
 
     def on_key_press(self, key, modifiers):
         for key_k in self.key_state.keys():
             if self.key_mappings[key_k] == key:
                 self.key_state[key_k] = True
-    
+
     def on_key_release(self, key, modifiers):
         for key_k in self.key_state.keys():
             if self.key_mappings[key_k] == key:
                 self.key_state[key_k] = False
-    
+
     def on_mouse_press(self, x, y, button, modifiers):
-        bullet = self.tank.fire()
-        self.bullet_list.append(bullet)
-
-    def movement(self):
-        self.tank.change_position(0,0)
-
-        if self.key_state["LEFT"] and not self.key_state["RIGHT"]:
-            self.tank.rotate_body(self.tank.rotation_speed)
-        elif self.key_state["RIGHT"] and not self.key_state["LEFT"]:
-            self.tank.rotate_body(-self.tank.rotation_speed)
-        if self.key_state["UP"] and not self.key_state["DOWN"]:
-            r = self.tank.rotation
-            y = math.sin(r) * self.tank.movement_speed
-            x = math.cos(r) * self.tank.movement_speed
-            self.tank.change_position(x,y)
-        elif self.key_state["DOWN"] and not self.key_state["UP"]:
-            r = self.tank.rotation
-            y = -math.sin(r) * self.tank.movement_speed
-            x = -math.cos(r) * self.tank.movement_speed
-            self.tank.change_position(x,y)
-
-    def rotate_turret(self):
-        turret_x, turret_y = self.tank.turret_sprite.position
-
-        x,y = self.mouse_position
-        if (turret_y-y) != 0:
-            rad = math.atan2((turret_x-x),(y-turret_y))
-            self.tank.rotate_turret(rad)
+        #print(x, y)
+        self.bullet_list.append(self.tank.fire())
 
     def on_mouse_motion(self, x, y, dx, dy):
         self.mouse_position = (x+dx, y+dy)
-        self.rotate_turret()
+        self.tank.rotate_turret(self.mouse_position,
+                                (self.view_left, self.view_bottom))
 
     def on_update(self, delta_time):
         """ Movement and game logic """
-        self.movement()
-        self.bullet_list.update()
-
-        for bullet in self.bullet_list:
-            hit_list = arcade.check_for_collision_with_list(bullet, self.wall_list)
-            if len(hit_list) > 0:
-                bullet.remove_from_sprite_lists()
+        self.tank.movement(self.key_state)
 
         for engine in self.physics_engines:
             engine.update()
+        
+        self.bullet_list.update()
+        for bullet in self.bullet_list:
+            hit_list = arcade.check_for_collision_with_list(
+                bullet, self.layers["boundary"])
+            hit_list.extend(arcade.check_for_collision_with_list(
+                bullet, self.layers["box"]))
+            if len(hit_list) > 0:
+                bullet.remove_from_sprite_lists()
+
         self.tank.body_sprite.position = self.tank.wheel_sprite.position
         self.tank.turret_sprite.position = self.tank.wheel_sprite.position
-        self.rotate_turret()
+        self.tank.rotate_turret(self.mouse_position,
+                                (self.view_left, self.view_bottom))
+
+        self.scroll(self.tank.body_sprite)
+    
+    
+    def draw_health(self):
+        height_offset = 15
+        healthbar_width = 70
+        healthbar_height = 10
+        if hasattr(self.tank, "health"):
+            sprite = self.tank.body_sprite
+            arcade.draw_rectangle_filled(sprite.center_x, sprite.center_y + sprite.height + height_offset, healthbar_width, healthbar_height, arcade.csscolor.GREEN)
+
+    def scroll(self, follow_sprite):
+        LEFT_VIEWPORT_MARGIN = 250
+        RIGHT_VIEWPORT_MARGIN = 250
+        BOTTOM_VIEWPORT_MARGIN = 250
+        TOP_VIEWPORT_MARGIN = 250
+
+        changed = False
+
+        # Scroll left
+        left_boundary = self.view_left + LEFT_VIEWPORT_MARGIN
+        if self.tank.body_sprite.left < left_boundary and self.view_left > self.level_boundary[0][0]:
+            self.view_left -= left_boundary - self.tank.body_sprite.left
+            changed = True
+
+        # Scroll right
+        right_boundary = self.view_left + \
+            self.window_size[0] - RIGHT_VIEWPORT_MARGIN
+        if self.tank.body_sprite.right > right_boundary and self.view_left + self.window_size[0] < self.level_boundary[1][0]:
+            self.view_left += self.tank.body_sprite.right - right_boundary
+            changed = True
+
+        # Scroll up
+        top_boundary = self.view_bottom + \
+            self.window_size[1] - TOP_VIEWPORT_MARGIN
+        if self.tank.body_sprite.top > top_boundary and self.view_bottom + self.window_size[1] < self.level_boundary[1][1]:
+            self.view_bottom += self.tank.body_sprite.top - top_boundary
+            changed = True
+
+        # Scroll down
+        bottom_boundary = self.view_bottom + BOTTOM_VIEWPORT_MARGIN
+        if self.tank.body_sprite.bottom < bottom_boundary and self.view_bottom > self.level_boundary[0][1]:
+            self.view_bottom -= bottom_boundary - self.tank.body_sprite.bottom
+            changed = True
+
+        if changed:
+            # Only scroll to integers. Otherwise we end up with pixels that
+            # don't line up on the screen
+            self.view_bottom = int(self.view_bottom)
+            self.view_left = int(self.view_left)
+
+            # Do the scrolling
+            arcade.set_viewport(self.view_left,
+                                self.window_size[0] + self.view_left,
+                                self.view_bottom,
+                                self.window_size[1] + self.view_bottom)
 
     def on_draw(self):
         arcade.start_render()
-        self.box_list.draw()
-        self.background_list.draw()
-        self.terrain_list.draw()
-        self.foreground_list.draw()
-        self.wall_list.draw()
+
+        for value in self.layers.values():
+            value.draw()
         self.bullet_list.draw()
         self.tank_list.draw()
+        self.draw_health()
 
 
 def main():
 
     key_mappings = {
-        "UP" : arcade.key.W,
+        "UP": arcade.key.W,
         "DOWN": arcade.key.S,
         "LEFT": arcade.key.A,
         "RIGHT": arcade.key.D,
     }
 
-    window = GameWindow(800, 600, "My Arcade game", key_mappings)
+    window = GameWindow(1024, 700, "My Arcade game", key_mappings)
     window.setup_level()
     arcade.run()
 
