@@ -1,3 +1,7 @@
-- Health
+- Enemy AI
+- Stats (Health/Currency)
 - Powerup
+- Upgradable
+- Sound
+- Main Menu, Game Over Screen, Controls
 - Refactor code

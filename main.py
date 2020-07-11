@@ -15,37 +15,26 @@ class GameWindow(arcade.Window):
 
     def setup_level(self, map_source="res/level.tmx"):
         self.tank_list = arcade.SpriteList()
-        self.tank = Tank()
-        self.tank_list.append(self.tank.wheel_sprite)
-        self.tank_list.append(self.tank.body_sprite)
-        self.tank_list.append(self.tank.turret_sprite)
+        self.tank = Tank(self.tank_list)
         self.tank.set_position(100, 100)
+
 
         self.bullet_list = arcade.SpriteList()
 
-        my_map = arcade.tilemap.read_tmx(map_source)
+        level_map = arcade.tilemap.read_tmx(map_source)
+
         self.layers = {key: None for key in (
             "boundary", "background", "terrain", "box")}
 
-        if my_map.background_color:
-            arcade.set_background_color(my_map.background_color)
-
+        if level_map.background_color:
+            arcade.set_background_color(level_map.background_color)
         for layer_name in self.layers.keys():
-            self.layers[layer_name] = arcade.tilemap.process_layer(map_object=my_map,
+            self.layers[layer_name] = arcade.tilemap.process_layer(map_object=level_map,
                                                                    layer_name=layer_name)
+        for sprite in self.layers["box"]:
+            sprite.health = 20
 
-        def calculate_boundary(boundary_layer):
-            x_list = []
-            y_list = []
-            tile_width = boundary_layer[0].width // 2
-            tile_height = boundary_layer[0].height // 2
-            for boundary in boundary_layer:
-                x_list.append(boundary.center_x)
-                y_list.append(boundary.center_y)
-            return ((min(x_list)-tile_width, min(y_list)-tile_height), (max(x_list)+tile_width, max(y_list)+tile_height))
-
-        self.level_boundary = calculate_boundary(self.layers["boundary"])
-        print(self.level_boundary)
+        self.level_boundary =((0,0), (level_map.map_size.width * level_map.tile_size.width, level_map.map_size.height * level_map.tile_size.height))
 
         self.physics_engines = []
         self.physics_engines.append(arcade.PhysicsEngineSimple(
@@ -85,11 +74,17 @@ class GameWindow(arcade.Window):
                 bullet, self.layers["boundary"])
             hit_list.extend(arcade.check_for_collision_with_list(
                 bullet, self.layers["box"]))
+
+            items = arcade.check_for_collision_with_list(bullet, self.layers["box"])
+            for item in items:
+                if hasattr(item, "health"):
+                    item.health -= bullet.damage
+                    if item.health <= 0:
+                        item.remove_from_sprite_lists()
             if len(hit_list) > 0:
                 bullet.remove_from_sprite_lists()
 
-        self.tank.body_sprite.position = self.tank.wheel_sprite.position
-        self.tank.turret_sprite.position = self.tank.wheel_sprite.position
+        self.tank.update()
         self.tank.rotate_turret(self.mouse_position,
                                 (self.view_left, self.view_bottom))
 
@@ -102,38 +97,44 @@ class GameWindow(arcade.Window):
         healthbar_height = 10
         if hasattr(self.tank, "health"):
             sprite = self.tank.body_sprite
-            arcade.draw_rectangle_filled(sprite.center_x, sprite.center_y + sprite.height + height_offset, healthbar_width, healthbar_height, arcade.csscolor.GREEN)
+            if self.tank.health != 100:
+                arcade.draw_rectangle_filled(sprite.center_x, sprite.center_y + sprite.height + height_offset, healthbar_width, healthbar_height, arcade.csscolor.WHITE)
+                width = healthbar_width * self.tank.health / 100
+                width_reduced = healthbar_width - width
+                arcade.draw_rectangle_filled(sprite.center_x - width_reduced / 2, sprite.center_y + sprite.height + height_offset, width, healthbar_height, arcade.csscolor.GREEN)
+
+
 
     def scroll(self, follow_sprite):
-        LEFT_VIEWPORT_MARGIN = 250
-        RIGHT_VIEWPORT_MARGIN = 250
-        BOTTOM_VIEWPORT_MARGIN = 250
-        TOP_VIEWPORT_MARGIN = 250
+        left_viewport_margin = 250
+        right_viewport_margin = 250
+        bottom_viewport_margin = 250
+        top_viewport_margin = 250
 
         changed = False
 
         # Scroll left
-        left_boundary = self.view_left + LEFT_VIEWPORT_MARGIN
+        left_boundary = self.view_left + left_viewport_margin
         if self.tank.body_sprite.left < left_boundary and self.view_left > self.level_boundary[0][0]:
             self.view_left -= left_boundary - self.tank.body_sprite.left
             changed = True
 
         # Scroll right
         right_boundary = self.view_left + \
-            self.window_size[0] - RIGHT_VIEWPORT_MARGIN
+            self.window_size[0] - right_viewport_margin
         if self.tank.body_sprite.right > right_boundary and self.view_left + self.window_size[0] < self.level_boundary[1][0]:
             self.view_left += self.tank.body_sprite.right - right_boundary
             changed = True
 
         # Scroll up
         top_boundary = self.view_bottom + \
-            self.window_size[1] - TOP_VIEWPORT_MARGIN
+            self.window_size[1] - top_viewport_margin
         if self.tank.body_sprite.top > top_boundary and self.view_bottom + self.window_size[1] < self.level_boundary[1][1]:
             self.view_bottom += self.tank.body_sprite.top - top_boundary
             changed = True
 
         # Scroll down
-        bottom_boundary = self.view_bottom + BOTTOM_VIEWPORT_MARGIN
+        bottom_boundary = self.view_bottom + bottom_viewport_margin
         if self.tank.body_sprite.bottom < bottom_boundary and self.view_bottom > self.level_boundary[0][1]:
             self.view_bottom -= bottom_boundary - self.tank.body_sprite.bottom
             changed = True
@@ -143,10 +144,8 @@ class GameWindow(arcade.Window):
             # don't line up on the screen
             self.view_bottom = int(self.view_bottom)
             self.view_left = int(self.view_left)
-
-            # Do the scrolling
             arcade.set_viewport(self.view_left,
-                                self.window_size[0] + self.view_left,
+                                int(self.window_size[0] + self.view_left),
                                 self.view_bottom,
                                 self.window_size[1] + self.view_bottom)
 
@@ -169,7 +168,7 @@ def main():
         "RIGHT": arcade.key.D,
     }
 
-    window = GameWindow(1024, 700, "My Arcade game", key_mappings)
+    window = GameWindow(1024, 700, "Fun with Tanks", key_mappings)
     window.setup_level()
     arcade.run()
 

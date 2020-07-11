@@ -1,3 +1,4 @@
 virtual/
 res/
 **/*.pyc
+arcade/

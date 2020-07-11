@@ -3,8 +3,8 @@ import math
 
 class Tank(object):
     
-    def __init__(self):
-        self.texture_list = arcade.load_spritesheet("res/tank_spritesheet_v2.png", 120, 120, 3, 3)
+    def __init__(self, tank_list, spritesheet = "res/tank_spritesheet_v2.png"):
+        self.texture_list = arcade.load_spritesheet(spritesheet, 120, 120, 3, 3)
         self.wheel_sprite = arcade.Sprite()
         self.wheel_sprite.append_texture(self.texture_list[0])
         self.wheel_sprite.set_texture(0)
@@ -24,6 +24,11 @@ class Tank(object):
         self.turret_sprite.set_texture(0)
         self.turret_sprite.center_x = 0
         self.turret_sprite.center_y = 0
+
+
+        tank_list.append(self.wheel_sprite)
+        tank_list.append(self.body_sprite)
+        tank_list.append(self.turret_sprite)
 
         self.movement_speed = 5
         self.rotation_speed = math.radians(3)
@@ -92,6 +97,10 @@ class Tank(object):
             y = -math.sin(r) * self.movement_speed
             x = -math.cos(r) * self.movement_speed
             self.change_position(x, y)
+    
+    def update(self):
+        self.body_sprite.position = self.wheel_sprite.position
+        self.turret_sprite.position = self.wheel_sprite.position
 
 class Bullet(arcade.Sprite):
     def __init__(self, position, rotation, speed, *args, **kwargs):
