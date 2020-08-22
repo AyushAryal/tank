@@ -1,6 +1,8 @@
 import arcade
 import math
 from tank import Tank
+import sys
+import pytiled_parser
 
 
 class GameWindow(arcade.Window):
@@ -18,11 +20,12 @@ class GameWindow(arcade.Window):
         self.tank = Tank(self.tank_list)
         self.tank.set_position(100, 100)
 
-
         self.bullet_list = arcade.SpriteList()
 
         level_map = arcade.tilemap.read_tmx(map_source)
-
+        self.level_boundary = ((0, 0), (level_map.map_size.width * level_map.tile_size.width,
+                                        level_map.map_size.height * level_map.tile_size.height))
+        enemies_position = self.get_enemies_position(level_map)
         self.layers = {key: None for key in (
             "boundary", "background", "terrain", "box")}
 
@@ -34,13 +37,62 @@ class GameWindow(arcade.Window):
         for sprite in self.layers["box"]:
             sprite.health = 20
 
-        self.level_boundary =((0,0), (level_map.map_size.width * level_map.tile_size.width, level_map.map_size.height * level_map.tile_size.height))
-
         self.physics_engines = []
         self.physics_engines.append(arcade.PhysicsEngineSimple(
             self.tank.wheel_sprite, self.layers["boundary"]))
         self.physics_engines.append(arcade.PhysicsEngineSimple(
             self.tank.wheel_sprite, self.layers["box"]))
+
+        self.ai_sprite_list = arcade.SpriteList()
+        self.ai_objects = []
+        for position in enemies_position:
+            ai_obj = Tank(self.ai_sprite_list, "res/ai.png")
+            ai_obj.set_position(*position)
+            self.ai_objects.append(ai_obj)
+            self.physics_engines.append(arcade.PhysicsEngineSimple(
+                ai_obj.wheel_sprite, self.tank_list))
+            self.physics_engines.append(arcade.PhysicsEngineSimple(
+                self.tank.wheel_sprite, self.ai_sprite_list))
+            self.physics_engines.append(arcade.PhysicsEngineSimple(
+                ai_obj.wheel_sprite, self.layers["boundary"]))
+            self.physics_engines.append(arcade.PhysicsEngineSimple(
+                ai_obj.wheel_sprite, self.layers["box"]))
+
+        self.path = None
+        self.create_barriers()
+
+    def create_barriers(self):
+        grid_size = 64
+
+        playing_field_left_boundary = self.level_boundary[0][0] + 64
+        playing_field_right_boundary = self.level_boundary[1][0] - 64
+        playing_field_top_boundary = self.level_boundary[1][1] - 64
+        playing_field_bottom_boundary = self.level_boundary[0][1] + 64
+        self.ai_barriers = []
+        for ai in self.ai_objects:
+            sp_list = arcade.SpriteList()
+            sp_list.extend(self.layers["box"])
+            sp_list.extend(self.layers["boundary"])
+            for o in self.ai_objects:
+                if ai!=o:
+                    sp_list.append(o.wheel_sprite)
+            self.ai_barriers.append(arcade.AStarBarrierList(self.ai_objects[0].wheel_sprite, sp_list , grid_size,
+                                                    playing_field_left_boundary,
+                                                    playing_field_right_boundary,
+                                                    playing_field_bottom_boundary,
+                                                    playing_field_top_boundary))
+
+
+    def get_enemies_position(self, level_map):
+        object_layers = filter(lambda x: isinstance(
+            x, pytiled_parser.objects.ObjectLayer), level_map.layers)
+        location = []
+        for layer in object_layers:
+            if layer.name == "enemies":
+                for obj in layer.tiled_objects:
+                    location.append(
+                        (obj.location.x, self.level_boundary[1][1] - obj.location.y))
+        return location
 
     def on_key_press(self, key, modifiers):
         for key_k in self.key_state.keys():
@@ -63,11 +115,11 @@ class GameWindow(arcade.Window):
 
     def on_update(self, delta_time):
         """ Movement and game logic """
-        self.tank.movement(self.key_state)
+        self.tank.movement(self.key_state, delta_time)
 
         for engine in self.physics_engines:
             engine.update()
-        
+
         self.bullet_list.update()
         for bullet in self.bullet_list:
             hit_list = arcade.check_for_collision_with_list(
@@ -75,22 +127,32 @@ class GameWindow(arcade.Window):
             hit_list.extend(arcade.check_for_collision_with_list(
                 bullet, self.layers["box"]))
 
-            items = arcade.check_for_collision_with_list(bullet, self.layers["box"])
+            items = arcade.check_for_collision_with_list(
+                bullet, self.layers["box"])
+            removed = False
             for item in items:
                 if hasattr(item, "health"):
                     item.health -= bullet.damage
                     if item.health <= 0:
                         item.remove_from_sprite_lists()
+                        removed = True
+            if removed:
+                self.create_barriers()
             if len(hit_list) > 0:
                 bullet.remove_from_sprite_lists()
 
         self.tank.update()
+        self.ai_objects[0].update()
         self.tank.rotate_turret(self.mouse_position,
                                 (self.view_left, self.view_bottom))
 
+        enemy = self.ai_objects[0].wheel_sprite
+        self.path = arcade.astar_calculate_path(enemy.position,
+                                                self.tank_list[0].position,
+                                                self.ai_barriers[0],
+                                                diagonal_movement=True)
         self.scroll(self.tank.body_sprite)
-    
-    
+
     def draw_health(self):
         height_offset = 15
         healthbar_width = 70
@@ -98,12 +160,12 @@ class GameWindow(arcade.Window):
         if hasattr(self.tank, "health"):
             sprite = self.tank.body_sprite
             if self.tank.health != 100:
-                arcade.draw_rectangle_filled(sprite.center_x, sprite.center_y + sprite.height + height_offset, healthbar_width, healthbar_height, arcade.csscolor.WHITE)
+                arcade.draw_rectangle_filled(sprite.center_x, sprite.center_y + sprite.height +
+                                             height_offset, healthbar_width, healthbar_height, arcade.csscolor.WHITE)
                 width = healthbar_width * self.tank.health / 100
                 width_reduced = healthbar_width - width
-                arcade.draw_rectangle_filled(sprite.center_x - width_reduced / 2, sprite.center_y + sprite.height + height_offset, width, healthbar_height, arcade.csscolor.GREEN)
-
-
+                arcade.draw_rectangle_filled(sprite.center_x - width_reduced / 2, sprite.center_y +
+                                             sprite.height + height_offset, width, healthbar_height, arcade.csscolor.GREEN)
 
     def scroll(self, follow_sprite):
         left_viewport_margin = 250
@@ -155,8 +217,12 @@ class GameWindow(arcade.Window):
         for value in self.layers.values():
             value.draw()
         self.bullet_list.draw()
+        self.ai_sprite_list.draw()
         self.tank_list.draw()
         self.draw_health()
+
+        if self.path:
+            arcade.draw_line_strip(self.path, arcade.color.BLUE, 2)
 
 
 def main():

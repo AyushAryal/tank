@@ -30,8 +30,8 @@ class Tank(object):
         tank_list.append(self.body_sprite)
         tank_list.append(self.turret_sprite)
 
-        self.movement_speed = 5
-        self.rotation_speed = math.radians(3)
+        self.movement_speed = 50
+        self.rotation_speed = math.radians(150)
         self.rotation = math.radians(90)
 
         self.health = 100.0
@@ -81,21 +81,21 @@ class Tank(object):
         bullet = Bullet(position, self.turret_sprite.radians + math.radians(90), speed = 10)
         return bullet
     
-    def movement(self, key_state):
+    def movement(self, key_state, delta_time):
         self.change_position(0, 0)
         if key_state["LEFT"] and not key_state["RIGHT"]:
-            self.rotate_body(self.rotation_speed)
+            self.rotate_body(self.rotation_speed * delta_time)
         elif key_state["RIGHT"] and not key_state["LEFT"]:
-            self.rotate_body(-self.rotation_speed)
+            self.rotate_body(-self.rotation_speed * delta_time)
         if key_state["UP"] and not key_state["DOWN"]:
             r = self.rotation
-            y = math.sin(r) * self.movement_speed
-            x = math.cos(r) * self.movement_speed
+            y = math.sin(r) * self.movement_speed * delta_time
+            x = math.cos(r) * self.movement_speed * delta_time
             self.change_position(x, y)
         elif key_state["DOWN"] and not key_state["UP"]:
             r = self.rotation
-            y = -math.sin(r) * self.movement_speed
-            x = -math.cos(r) * self.movement_speed
+            y = -math.sin(r) * self.movement_speed * delta_time
+            x = -math.cos(r) * self.movement_speed * delta_time
             self.change_position(x, y)
     
     def update(self):
