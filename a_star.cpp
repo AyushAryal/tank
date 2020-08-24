@@ -27,6 +27,7 @@ struct Node {
     }
 };
 
+
 class Graph {
     std::vector<std::vector<std::pair<std::uint32_t, std::uint32_t>>> graph;
 
@@ -51,13 +52,13 @@ class Graph {
 
     void add_edge(std::uint32_t vertA, std::uint32_t vertB,
                   std::uint32_t weight = 1) {
-        assert(vertA >= graph.size() ||
-               vertB >= graph.size() && "Vertex index not in range.");
+        assert(vertA < graph.size() ||
+               vertB < graph.size() && "Vertex index not in range.");
         auto& vertA_conn = graph[vertA];
         auto ret =
             std::find_if(vertA_conn.begin(), vertA_conn.end(),
                          [vertB](const auto& i) { return i.first == vertB; });
-        assert(ret != vertA_conn.end() && "Edge already exists.");
+        assert(("Edge already exists.", ret == vertA_conn.end()));
         vertA_conn.push_back({vertB, weight});
     }
 
@@ -115,11 +116,11 @@ class Graph {
         return {};
     }
 
-    std::vector<std::uint32_t> dijkstra(std::uint32_t startVert,
-                                        std::uint32_t endVert) {
+    std::vector<std::uint32_t> a_star(std::uint32_t startVert,
+                                      std::uint32_t endVert,
+                                      std::uint32_t (*h)(std::uint32_t)) {
         PriorityQueue<Node> q;
         std::unordered_map<std::uint32_t, Node> q_map;
-        std::unordered_map<std::uint32_t, Node> finished_pile;
         std::vector<bool> visited(graph.size());
 
         q.push({startVert, 0, startVert});
@@ -128,14 +129,63 @@ class Graph {
         while (!q.empty()) {
             auto parent = q.front();
             q.pop();
-            finished_pile[parent.node_id] = parent;
-            q_map.erase(parent.node_id);
             if (parent.node_id == endVert) {
                 break;
             }
             visited[parent.node_id] = true;
 
-            auto adj = graph[parent.node_id];
+            auto& adj = graph[parent.node_id];
+            for (auto [i, weight] : adj) {
+                auto it = q_map.find(i);
+                if (it == q_map.end() && !visited[i]) {
+                    q.push({i, weight + parent.distance + h(i), parent.node_id});
+                    q_map[i] = {i, weight + parent.distance + h(i), parent.node_id};
+                } else {
+                    auto child = q_map[i];
+                    if (parent.distance + weight < child.distance) {
+                        q.remove(child);
+                        child.distance = parent.distance + weight + h(i);
+                        child.parent = parent.node_id;
+                        q.push(child);
+                        q_map[i] = child;
+                    }
+                }
+            }
+        }
+
+        if (q_map.find(endVert) == q_map.end()) {
+            return {};
+        }
+
+        std::vector<uint32_t> path;
+        auto vert = endVert;
+        do {
+            path.push_back(vert);
+            vert = q_map[vert].parent;
+        } while (vert != startVert);
+        path.push_back(startVert);
+        std::reverse(path.begin(), path.end());
+        return path;
+    }
+
+    std::vector<std::uint32_t> dijkstra(std::uint32_t startVert,
+                                        std::uint32_t endVert) {
+        PriorityQueue<Node> q;
+        std::unordered_map<std::uint32_t, Node> q_map;
+        std::vector<bool> visited(graph.size());
+
+        q.push({startVert, 0, startVert});
+        q_map[startVert] = {startVert, 0, startVert};
+
+        while (!q.empty()) {
+            auto parent = q.front();
+            q.pop();
+            if (parent.node_id == endVert) {
+                break;
+            }
+            visited[parent.node_id] = true;
+
+            auto& adj = graph[parent.node_id];
             for (auto [i, weight] : adj) {
                 auto it = q_map.find(i);
                 if (it == q_map.end() && !visited[i]) {
@@ -154,7 +204,7 @@ class Graph {
             }
         }
 
-        if (finished_pile.find(endVert) == finished_pile.end()) {
+        if (q_map.find(endVert) == q_map.end()) {
             return {};
         }
 
@@ -162,7 +212,7 @@ class Graph {
         auto vert = endVert;
         do {
             path.push_back(vert);
-            vert = finished_pile[vert].parent;
+            vert = q_map[vert].parent;
         } while (vert != startVert);
         path.push_back(startVert);
         std::reverse(path.begin(), path.end());

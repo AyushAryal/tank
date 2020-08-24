@@ -1,6 +1,6 @@
 import arcade
 import math
-from tank import Tank
+from tank import Tank, CustomAStarBarrierList
 import sys
 import pytiled_parser
 
@@ -69,18 +69,17 @@ class GameWindow(arcade.Window):
         playing_field_top_boundary = self.level_boundary[1][1] - 64
         playing_field_bottom_boundary = self.level_boundary[0][1] + 64
         self.ai_barriers = []
-        for ai in self.ai_objects:
-            sp_list = arcade.SpriteList()
-            sp_list.extend(self.layers["box"])
-            sp_list.extend(self.layers["boundary"])
-            for o in self.ai_objects:
-                if ai!=o:
-                    sp_list.append(o.wheel_sprite)
-            self.ai_barriers.append(arcade.AStarBarrierList(self.ai_objects[0].wheel_sprite, sp_list , grid_size,
+        sp_list = arcade.SpriteList()
+        sp_list.extend(self.layers["box"])
+        sp_list.extend(self.layers["boundary"])
+        barrier_list = CustomAStarBarrierList(None, sp_list , grid_size,
                                                     playing_field_left_boundary,
                                                     playing_field_right_boundary,
                                                     playing_field_bottom_boundary,
-                                                    playing_field_top_boundary))
+                                                    playing_field_top_boundary)
+        for ai in self.ai_objects:
+            barrier_list.moving_sprite = self.ai_objects[0].wheel_sprite
+            self.ai_barriers.append(barrier_list)
 
 
     def get_enemies_position(self, level_map):
