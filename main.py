@@ -150,6 +150,7 @@ class GameWindow(arcade.Window):
                                                 self.tank_list[0].position,
                                                 self.ai_barriers[0],
                                                 diagonal_movement=True)
+        
         self.scroll(self.tank.body_sprite)
 
     def draw_health(self):
