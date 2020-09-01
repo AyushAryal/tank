@@ -36,6 +36,8 @@ class Tank(object):
         self.rotation = math.radians(90)
 
         self.health = 100.0
+        self.ai_fire_rate = 0.5
+        self.ai_fire_dt = 0
 
     def set_position(self, x, y):
         self.wheel_sprite.center_x = x

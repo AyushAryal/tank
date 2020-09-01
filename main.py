@@ -72,15 +72,14 @@ class GameWindow(arcade.Window):
         sp_list = arcade.SpriteList()
         sp_list.extend(self.layers["box"])
         sp_list.extend(self.layers["boundary"])
-        barrier_list = CustomAStarBarrierList(None, sp_list , grid_size,
-                                                    playing_field_left_boundary,
-                                                    playing_field_right_boundary,
-                                                    playing_field_bottom_boundary,
-                                                    playing_field_top_boundary)
+        barrier_list = CustomAStarBarrierList(None, sp_list, grid_size,
+                                              playing_field_left_boundary,
+                                              playing_field_right_boundary,
+                                              playing_field_bottom_boundary,
+                                              playing_field_top_boundary)
         for ai in self.ai_objects:
             barrier_list.moving_sprite = self.ai_objects[0].wheel_sprite
             self.ai_barriers.append(barrier_list)
-
 
     def get_enemies_position(self, level_map):
         object_layers = filter(lambda x: isinstance(
@@ -150,7 +149,29 @@ class GameWindow(arcade.Window):
                                                 self.tank_list[0].position,
                                                 self.ai_barriers[0],
                                                 diagonal_movement=True)
-        
+        if self.path and len(self.path) > 1:
+            x1, y1 = self.path[1]
+            x2, y2 = self.ai_objects[0].wheel_sprite.position
+            direction = (x1-x2), (y1-y2)
+            x, y = direction
+            magnitude = (x**2 + y**2)**0.5
+            unit_vector = x/magnitude, y/magnitude
+            velocity = self.ai_objects[0].movement_speed
+            req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
+            delta_position = req_vector[0] * \
+                delta_time, req_vector[1] * delta_time
+            x, y = self.tank.body_sprite.position
+            turret_x, turret_y = self.ai_objects[0].turret_sprite.position
+            if (turret_y-y) != 0:
+                rad = math.atan2((turret_x-x), (y-turret_y))
+                self.ai_objects[0].turret_sprite.radians = rad
+
+            self.ai_objects[0].change_position(*delta_position)
+            self.ai_objects[0].ai_fire_dt += delta_time
+            if (self.ai_objects[0].ai_fire_dt > (1/self.ai_objects[0].ai_fire_rate)):
+                self.bullet_list.append(self.ai_objects[0].fire())
+                self.ai_objects[0].ai_fire_dt -= (1 /
+                                                  self.ai_objects[0].ai_fire_rate)
         self.scroll(self.tank.body_sprite)
 
     def draw_health(self):
