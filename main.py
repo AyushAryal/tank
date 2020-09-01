@@ -160,12 +160,17 @@ class GameWindow(arcade.Window):
             req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
             delta_position = req_vector[0] * \
                 delta_time, req_vector[1] * delta_time
+
+            angle = math.atan2(*unit_vector[::-1])-self.ai_objects[0].rotation
+            self.ai_objects[0].rotate_body(angle)
+            #ai turret roatation
             x, y = self.tank.body_sprite.position
             turret_x, turret_y = self.ai_objects[0].turret_sprite.position
             if (turret_y-y) != 0:
                 rad = math.atan2((turret_x-x), (y-turret_y))
                 self.ai_objects[0].turret_sprite.radians = rad
 
+            #ai bullet firing
             self.ai_objects[0].change_position(*delta_position)
             self.ai_objects[0].ai_fire_dt += delta_time
             if (self.ai_objects[0].ai_fire_dt > (1/self.ai_objects[0].ai_fire_rate)):
