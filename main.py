@@ -145,38 +145,42 @@ class GameWindow(arcade.Window):
                                 (self.view_left, self.view_bottom))
 
         enemy = self.ai_objects[0].wheel_sprite
-        self.path = arcade.astar_calculate_path(enemy.position,
-                                                self.tank_list[0].position,
-                                                self.ai_barriers[0],
-                                                diagonal_movement=True)
-        if self.path and len(self.path) > 1:
-            x1, y1 = self.path[1]
-            x2, y2 = self.ai_objects[0].wheel_sprite.position
-            direction = (x1-x2), (y1-y2)
-            x, y = direction
-            magnitude = (x**2 + y**2)**0.5
-            unit_vector = x/magnitude, y/magnitude
-            velocity = self.ai_objects[0].movement_speed
-            req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
-            delta_position = req_vector[0] * \
-                delta_time, req_vector[1] * delta_time
+        enemy_x,enemy_y=enemy.position
+        tank_x,tank_y=self.tank.wheel_sprite.position
+        distance_between_ai_and_tank= ((tank_x-enemy_x)**2 +(tank_y-enemy_y)**2)**(0.5)
+        if distance_between_ai_and_tank<1000:
+            self.path = arcade.astar_calculate_path(enemy.position,
+                                                    self.tank_list[0].position,
+                                                    self.ai_barriers[0],
+                                                    diagonal_movement=True)
+            if self.path and len(self.path) > 1:
+                x1, y1 = self.path[1]
+                x2, y2 = self.ai_objects[0].wheel_sprite.position
+                direction = (x1-x2), (y1-y2)
+                x, y = direction
+                magnitude = (x**2 + y**2)**0.5
+                unit_vector = x/magnitude, y/magnitude
+                velocity = self.ai_objects[0].movement_speed
+                req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
+                delta_position = req_vector[0] * \
+                    delta_time, req_vector[1] * delta_time
 
-            angle = math.atan2(*unit_vector[::-1])-self.ai_objects[0].rotation
-            self.ai_objects[0].rotate_body(angle)
-            #ai turret roatation
-            x, y = self.tank.body_sprite.position
-            turret_x, turret_y = self.ai_objects[0].turret_sprite.position
-            if (turret_y-y) != 0:
-                rad = math.atan2((turret_x-x), (y-turret_y))
-                self.ai_objects[0].turret_sprite.radians = rad
+                angle = math.atan2(*unit_vector[::-1])-self.ai_objects[0].rotation
+                self.ai_objects[0].rotate_body(angle)
+                #ai turret roatation
+                x, y = self.tank.body_sprite.position
+                turret_x, turret_y = self.ai_objects[0].turret_sprite.position
+                if (turret_y-y) != 0:
+                    rad = math.atan2((turret_x-x), (y-turret_y))
+                    self.ai_objects[0].turret_sprite.radians = rad
 
-            #ai bullet firing
-            self.ai_objects[0].change_position(*delta_position)
-            self.ai_objects[0].ai_fire_dt += delta_time
-            if (self.ai_objects[0].ai_fire_dt > (1/self.ai_objects[0].ai_fire_rate)):
-                self.bullet_list.append(self.ai_objects[0].fire())
-                self.ai_objects[0].ai_fire_dt -= (1 /
-                                                  self.ai_objects[0].ai_fire_rate)
+                #ai bullet firing
+                self.ai_objects[0].change_position(*delta_position)
+                self.ai_objects[0].ai_fire_dt += delta_time
+                if (self.ai_objects[0].ai_fire_dt > (1/self.ai_objects[0].ai_fire_rate)):
+                    self.bullet_list.append(self.ai_objects[0].fire())
+                    self.ai_objects[0].ai_fire_dt -= (1 /
+                                                    self.ai_objects[0].ai_fire_rate)
         self.scroll(self.tank.body_sprite)
 
     def draw_health(self):
