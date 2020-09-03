@@ -57,7 +57,6 @@ class GameWindow(arcade.Window):
                 ai_obj.wheel_sprite, self.layers["boundary"]))
             self.physics_engines.append(arcade.PhysicsEngineSimple(
                 ai_obj.wheel_sprite, self.layers["box"]))
-
         self.path = None
         self.create_barriers()
 
@@ -72,13 +71,14 @@ class GameWindow(arcade.Window):
         sp_list = arcade.SpriteList()
         sp_list.extend(self.layers["box"])
         sp_list.extend(self.layers["boundary"])
+        
         barrier_list = CustomAStarBarrierList(None, sp_list, grid_size,
                                               playing_field_left_boundary,
                                               playing_field_right_boundary,
                                               playing_field_bottom_boundary,
                                               playing_field_top_boundary)
         for ai in self.ai_objects:
-            barrier_list.moving_sprite = self.ai_objects[0].wheel_sprite
+            barrier_list.moving_sprite = ai.wheel_sprite
             self.ai_barriers.append(barrier_list)
 
     def get_enemies_position(self, level_map):
@@ -127,6 +127,7 @@ class GameWindow(arcade.Window):
 
             items = arcade.check_for_collision_with_list(
                 bullet, self.layers["box"])
+
             removed = False
             for item in items:
                 if hasattr(item, "health"):
@@ -140,47 +141,49 @@ class GameWindow(arcade.Window):
                 bullet.remove_from_sprite_lists()
 
         self.tank.update()
-        self.ai_objects[0].update()
+       
         self.tank.rotate_turret(self.mouse_position,
                                 (self.view_left, self.view_bottom))
+        for self.ai_object in self.ai_objects:
+            self.ai_object.update()
+            
+            enemy = self.ai_object.wheel_sprite
+            enemy_x,enemy_y=enemy.position
+            tank_x,tank_y=self.tank.wheel_sprite.position
+            distance_between_ai_and_tank= ((tank_x-enemy_x)**2 +(tank_y-enemy_y)**2)**(0.5)
+            if distance_between_ai_and_tank<1000 and distance_between_ai_and_tank>100:
+                self.path = arcade.astar_calculate_path(enemy.position,
+                                                        self.tank_list[0].position,
+                                                        self.ai_barriers[0],
+                                                        diagonal_movement=True)
+                if self.path and len(self.path) > 1 and distance_between_ai_and_tank>100 :
+                    x1, y1 = self.path[1]
+                    x2, y2 = self.ai_object.wheel_sprite.position
+                    direction = (x1-x2), (y1-y2)
+                    x, y = direction
+                    magnitude = (x**2 + y**2)**0.5
+                    unit_vector = x/magnitude, y/magnitude
+                    velocity = self.ai_object.movement_speed
+                    req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
+                    delta_position = req_vector[0] * \
+                        delta_time, req_vector[1] * delta_time
 
-        enemy = self.ai_objects[0].wheel_sprite
-        enemy_x,enemy_y=enemy.position
-        tank_x,tank_y=self.tank.wheel_sprite.position
-        distance_between_ai_and_tank= ((tank_x-enemy_x)**2 +(tank_y-enemy_y)**2)**(0.5)
-        if distance_between_ai_and_tank<1000:
-            self.path = arcade.astar_calculate_path(enemy.position,
-                                                    self.tank_list[0].position,
-                                                    self.ai_barriers[0],
-                                                    diagonal_movement=True)
-            if self.path and len(self.path) > 1:
-                x1, y1 = self.path[1]
-                x2, y2 = self.ai_objects[0].wheel_sprite.position
-                direction = (x1-x2), (y1-y2)
-                x, y = direction
-                magnitude = (x**2 + y**2)**0.5
-                unit_vector = x/magnitude, y/magnitude
-                velocity = self.ai_objects[0].movement_speed
-                req_vector = unit_vector[0]*velocity, unit_vector[1]*velocity
-                delta_position = req_vector[0] * \
-                    delta_time, req_vector[1] * delta_time
+                    angle = math.atan2(*unit_vector[::-1])-self.ai_object.rotation
+                    self.ai_object.rotate_body(angle)
+                    #ai turret roatation
+                    x, y = self.tank.body_sprite.position
+                    turret_x, turret_y = self.ai_object.turret_sprite.position
+                    if (turret_y-y) != 0:
+                        rad = math.atan2((turret_x-x), (y-turret_y))
+                        self.ai_object.turret_sprite.radians = rad
 
-                angle = math.atan2(*unit_vector[::-1])-self.ai_objects[0].rotation
-                self.ai_objects[0].rotate_body(angle)
-                #ai turret roatation
-                x, y = self.tank.body_sprite.position
-                turret_x, turret_y = self.ai_objects[0].turret_sprite.position
-                if (turret_y-y) != 0:
-                    rad = math.atan2((turret_x-x), (y-turret_y))
-                    self.ai_objects[0].turret_sprite.radians = rad
-
-                #ai bullet firing
-                self.ai_objects[0].change_position(*delta_position)
-                self.ai_objects[0].ai_fire_dt += delta_time
-                if (self.ai_objects[0].ai_fire_dt > (1/self.ai_objects[0].ai_fire_rate)):
-                    self.bullet_list.append(self.ai_objects[0].fire())
-                    self.ai_objects[0].ai_fire_dt -= (1 /
-                                                    self.ai_objects[0].ai_fire_rate)
+                    #ai bullet firing
+                    self.ai_object.change_position(*delta_position)
+                    self.ai_object.ai_fire_dt += delta_time
+                    if (self.ai_object.ai_fire_dt > (1/self.ai_object.ai_fire_rate)):
+                        self.bullet_list.append(self.ai_object.fire())
+                        self.ai_object.ai_fire_dt -= (1 /
+                                                        self.ai_object.ai_fire_rate)
         self.scroll(self.tank.body_sprite)
 
     def draw_health(self):
